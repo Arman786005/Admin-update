@@ -2,447 +2,132 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ArEQuiz Admin Panel</title>
+  <title>AI MCQ Admin Panel</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <!-- Tailwind CSS -->
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <!-- Animate.css -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-  <style>
-    .quiz-card { box-shadow: 0 8px 24px 0 rgba(80, 70, 229, 0.10), 0 1.5px 3px 0 rgba(0,0,0,0.05); }
-    .quiz-card:hover { transform: translateY(-4px) scale(1.03); }
-    .tab-btn { cursor:pointer; }
-    .tab-btn.active { background: #a5b4fc; color: #4f46e5; }
-    .modal-bg { background:rgba(0,0,0,0.3); }
-    .edit-btn, .del-btn { cursor:pointer; }
-    @media (max-width: 640px) {
-      .tab-btn { font-size: 1rem !important; padding: 0.6rem 1rem !important; }
-      .quiz-card { padding: 1.2rem !important; }
-    }
-  </style>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 </head>
-<body class="bg-gradient-to-br from-gray-100 via-purple-100 to-blue-100 min-h-screen flex flex-col items-center justify-center">
-
-  <!-- Auth Section -->
-  <div id="auth-section" class="w-full max-w-xs mx-auto mt-10 animate__animated animate__fadeIn">
-    <div class="bg-white shadow-lg rounded-lg p-8 quiz-card">
-      <h2 class="text-2xl font-bold text-center mb-6 text-purple-600">Admin Login</h2>
-      <input id="email" type="email" placeholder="Email" class="mb-3 w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-400 transition"/>
-      <input id="password" type="password" placeholder="Password" class="mb-3 w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-400 transition"/>
-      <button onclick="signInAdmin()" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-semibold p-2 rounded mb-2 transition animate__animated animate__pulse">Sign In as Admin</button>
+<body class="bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 min-h-screen flex items-center justify-center">
+  <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl">
+    <h2 class="text-2xl font-bold mb-4 text-purple-700">AI MCQ Generator (Admin)</h2>
+    <div class="flex flex-col gap-2 mb-4">
+      <input id="question" type="text" placeholder="Enter question" class="p-2 border rounded" />
+      <input id="answer" type="text" placeholder="Enter correct answer" class="p-2 border rounded" />
+      <button onclick="generateMCQ()" class="bg-purple-500 hover:bg-purple-600 text-white p-2 rounded transition">Generate Options with AI</button>
     </div>
+    <div id="loading" class="text-blue-600 mb-2 hidden">Generating...</div>
+    <form id="mcq-form" class="mb-4 hidden" onsubmit="saveMCQ(event)">
+      <div class="grid grid-cols-1 sm:grid-cols-6 gap-2 mb-2">
+        <input id="mcq-question" name="mcq-question" class="p-2 border rounded col-span-2" />
+        <input id="mcq-option-a" name="mcq-option-a" class="p-2 border rounded" />
+        <input id="mcq-option-b" name="mcq-option-b" class="p-2 border rounded" />
+        <input id="mcq-option-c" name="mcq-option-c" class="p-2 border rounded" />
+        <input id="mcq-option-d" name="mcq-option-d" class="p-2 border rounded" />
+        <input id="mcq-correct" name="mcq-correct" class="p-2 border rounded" />
+      </div>
+      <button type="submit" class="bg-green-500 hover:bg-green-600 text-white p-2 rounded">Save MCQ</button>
+    </form>
+    <div id="mcq-list" class="mt-6"></div>
   </div>
-
-  <!-- Admin Panel -->
-  <div id="admin-section" class="hidden w-full max-w-5xl mx-auto mt-10 animate__animated animate__fadeIn">
-    <div class="bg-white shadow-lg rounded-lg p-4 sm:p-8 quiz-card">
-      <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
-        <h1 class="text-3xl font-bold text-purple-700">ArEQuiz Admin Panel</h1>
-        <button onclick="signOut()" class="bg-red-400 hover:bg-red-500 text-white font-semibold px-3 py-1 rounded transition">Sign Out</button>
-      </div>
-      <!-- Tabs -->
-      <div class="flex gap-2 mb-6">
-        <button class="tab-btn px-6 py-2 bg-purple-100 rounded font-semibold active" id="tab-questions" onclick="switchTab('questions')">Questions</button>
-        <button class="tab-btn px-6 py-2 bg-purple-100 rounded font-semibold" id="tab-scores" onclick="switchTab('scores')">Scores</button>
-      </div>
-      <!-- Tab Content -->
-      <div id="tab-content-questions">
-        <!-- Subjects/Chapters/Questions spatial UI -->
-        <div class="flex flex-col sm:flex-row gap-4">
-          <!-- Subjects -->
-          <div class="flex-1">
-            <div class="font-semibold mb-2">Subjects</div>
-            <div class="flex gap-2 mb-2">
-              <input id="subject-name" type="text" placeholder="Subject Name" class="p-2 border rounded flex-1"/>
-              <button onclick="addSubject()" class="bg-green-500 hover:bg-green-600 text-white p-2 rounded transition">Add</button>
-            </div>
-            <div id="admin-subjects-list" class="flex flex-col gap-1"></div>
-          </div>
-          <!-- Chapters -->
-          <div class="flex-1">
-            <div class="font-semibold mb-2">Chapters</div>
-            <div class="flex gap-2 mb-2">
-              <input id="chapter-name" type="text" placeholder="Chapter Name" class="p-2 border rounded flex-1"/>
-              <button onclick="addChapter()" class="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded transition">Add</button>
-            </div>
-            <div id="admin-chapters-list" class="flex flex-col gap-1"></div>
-          </div>
-          <!-- Questions -->
-          <div class="flex-1">
-            <div class="font-semibold mb-2">Questions</div>
-            <div class="flex flex-col gap-2 mb-2">
-              <input id="question-text" type="text" placeholder="Question" class="p-2 border rounded"/>
-              <input id="option1" type="text" placeholder="Option 1" class="p-2 border rounded"/>
-              <input id="option2" type="text" placeholder="Option 2" class="p-2 border rounded"/>
-              <input id="option3" type="text" placeholder="Option 3" class="p-2 border rounded"/>
-              <input id="option4" type="text" placeholder="Option 4" class="p-2 border rounded"/>
-              <input id="answer" type="text" placeholder="Correct Answer (must match one option)" class="p-2 border rounded"/>
-              <button onclick="addQuestion()" class="bg-purple-500 hover:bg-purple-600 text-white p-2 rounded transition">Add</button>
-            </div>
-            <div id="admin-questions-list" class="flex flex-col gap-2"></div>
-          </div>
-        </div>
-      </div>
-      <div id="tab-content-scores" class="hidden">
-        <h2 class="text-xl font-bold mb-4 text-purple-700">All User Scores</h2>
-        <div class="overflow-x-auto">
-          <table class="w-full text-center text-sm">
-            <thead>
-              <tr>
-                <th class="border px-2 py-1">User Email</th>
-                <th class="border px-2 py-1">Subject</th>
-                <th class="border px-2 py-1">Chapter</th>
-                <th class="border px-2 py-1">Score</th>
-                <th class="border px-2 py-1">Total</th>
-                <th class="border px-2 py-1">Date</th>
-              </tr>
-            </thead>
-            <tbody id="score-table"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Edit Modal -->
-  <div id="modal-bg" class="fixed inset-0 flex items-center justify-center z-50 modal-bg hidden">
-    <div id="modal-content" class="bg-white rounded-lg p-6 shadow-lg w-full max-w-md animate__animated animate__fadeIn"></div>
-  </div>
-
-  <!-- Supabase library -->
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script>
-    // Supabase credentials
-    const SUPABASE_URL = 'https://kahycodadobjjqriskoc.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthaHljb2RhZG9iampxcmlza29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY4NTM4MDgsImV4cCI6MjA2MjQyOTgwOH0.QWPod9Pn1_fA9L9Xr6rmYpdX7BqV1AeUXp8BzatgAwo';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const OPENAI_API_KEY = "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";
 
-    let selectedSubjectId = null;
-    let selectedChapterId = null;
-
-    // Tabs
-    function switchTab(tab) {
-      document.getElementById('tab-questions').classList.remove('active');
-      document.getElementById('tab-scores').classList.remove('active');
-      document.getElementById('tab-content-questions').classList.add('hidden');
-      document.getElementById('tab-content-scores').classList.add('hidden');
-      if (tab === 'questions') {
-        document.getElementById('tab-questions').classList.add('active');
-        document.getElementById('tab-content-questions').classList.remove('hidden');
-      } else {
-        document.getElementById('tab-scores').classList.add('active');
-        document.getElementById('tab-content-scores').classList.remove('hidden');
-        loadScores();
-      }
-    }
-
-    // Admin Sign In
-    async function signInAdmin() {
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-      if (!email || !password) {
-        alert("Please enter both email and password.");
-        return;
-      }
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        alert(error.message);
-        return;
-      }
-      // Check if user is admin
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('is_admin')
-        .eq('email', email)
-        .single();
-      if (userError || !userData || !userData.is_admin) {
-        alert('Not an admin!');
-        await supabase.auth.signOut();
-        return;
-      }
-      document.getElementById('auth-section').classList.add('hidden');
-      document.getElementById('admin-section').classList.remove('hidden');
-      switchTab('questions');
-      loadSubjects();
-      loadChapters();
-      loadQuestions();
-    }
-
-    // Sign Out
-    async function signOut() {
-      await supabase.auth.signOut();
-      document.getElementById('admin-section').classList.add('hidden');
-      document.getElementById('auth-section').classList.remove('hidden');
-    }
-
-    // Subjects CRUD
-    async function addSubject() {
-      const name = document.getElementById('subject-name').value.trim();
-      if (!name) return alert("Enter subject name.");
-      const { error } = await supabase.from('subjects').insert([{ name }]);
-      if (error) alert(error.message);
-      else {
-        document.getElementById('subject-name').value = '';
-        loadSubjects();
-      }
-    }
-    async function editSubject(id, oldName) {
-      showModal(`
-        <h3 class="font-bold mb-2">Edit Subject</h3>
-        <input id="edit-subject-name" class="p-2 border rounded w-full mb-4" value="${oldName}">
-        <div class="flex gap-2">
-          <button onclick="updateSubject(${id})" class="bg-green-500 hover:bg-green-600 text-white p-2 rounded flex-1">Save</button>
-          <button onclick="hideModal()" class="bg-gray-200 p-2 rounded flex-1">Cancel</button>
-        </div>
-      `);
-    }
-    async function updateSubject(id) {
-      const name = document.getElementById('edit-subject-name').value.trim();
-      if (!name) return alert("Enter subject name.");
-      const { error } = await supabase.from('subjects').update({ name }).eq('id', id);
-      if (error) alert(error.message);
-      hideModal();
-      loadSubjects();
-    }
-    async function deleteSubject(id) {
-      if (!confirm('Delete this subject and all its chapters/questions?')) return;
-      await supabase.from('subjects').delete().eq('id', id);
-      loadSubjects();
-      loadChapters();
-      loadQuestions();
-    }
-    async function loadSubjects() {
-      const { data, error } = await supabase.from('subjects').select('*');
-      if (error) return alert(error.message);
-      // List
-      const list = document.getElementById('admin-subjects-list');
-      list.innerHTML = '';
-      data.forEach(subject => {
-        const div = document.createElement('div');
-        div.className = 'quiz-card bg-purple-100 text-purple-900 px-3 py-1 rounded shadow flex items-center gap-2 animate__animated animate__fadeIn';
-        div.innerHTML = `
-          <span class="flex-1 cursor-pointer font-semibold" onclick="selectSubject(${subject.id})" style="text-decoration:${selectedSubjectId===subject.id?'underline':''}">${subject.name}</span>
-          <span class="edit-btn text-blue-600" title="Edit" onclick="editSubject(${subject.id},'${subject.name.replace(/'/g,"\\'")}')">&#9998;</span>
-          <span class="del-btn text-red-600" title="Delete" onclick="deleteSubject(${subject.id})">&#128465;</span>
-        `;
-        list.appendChild(div);
-      });
-    }
-    function selectSubject(id) {
-      selectedSubjectId = id;
-      loadChapters();
-      loadQuestions();
-    }
-
-    // Chapters CRUD
-    async function addChapter() {
-      if (!selectedSubjectId) return alert("Select a subject first.");
-      const name = document.getElementById('chapter-name').value.trim();
-      if (!name) return alert("Enter chapter name.");
-      const { error } = await supabase.from('chapters').insert([{ name, subject_id: selectedSubjectId }]);
-      if (error) alert(error.message);
-      else {
-        document.getElementById('chapter-name').value = '';
-        loadChapters();
-      }
-    }
-    async function editChapter(id, oldName) {
-      showModal(`
-        <h3 class="font-bold mb-2">Edit Chapter</h3>
-        <input id="edit-chapter-name" class="p-2 border rounded w-full mb-4" value="${oldName}">
-        <div class="flex gap-2">
-          <button onclick="updateChapter(${id})" class="bg-green-500 hover:bg-green-600 text-white p-2 rounded flex-1">Save</button>
-          <button onclick="hideModal()" class="bg-gray-200 p-2 rounded flex-1">Cancel</button>
-        </div>
-      `);
-    }
-    async function updateChapter(id) {
-      const name = document.getElementById('edit-chapter-name').value.trim();
-      if (!name) return alert("Enter chapter name.");
-      const { error } = await supabase.from('chapters').update({ name }).eq('id', id);
-      if (error) alert(error.message);
-      hideModal();
-      loadChapters();
-    }
-    async function deleteChapter(id) {
-      if (!confirm('Delete this chapter and all its questions?')) return;
-      await supabase.from('chapters').delete().eq('id', id);
-      loadChapters();
-      loadQuestions();
-    }
-    async function loadChapters() {
-      if (!selectedSubjectId) {
-        document.getElementById('admin-chapters-list').innerHTML = '<span class="text-gray-400">Select a subject</span>';
-        return;
-      }
-      const { data, error } = await supabase.from('chapters').select('*').eq('subject_id', selectedSubjectId);
-      if (error) return alert(error.message);
-      const list = document.getElementById('admin-chapters-list');
-      list.innerHTML = '';
-      data.forEach(chapter => {
-        const div = document.createElement('div');
-        div.className = 'quiz-card bg-blue-100 text-blue-900 px-3 py-1 rounded shadow flex items-center gap-2 animate__animated animate__fadeIn';
-        div.innerHTML = `
-          <span class="flex-1 cursor-pointer font-semibold" onclick="selectChapter(${chapter.id})" style="text-decoration:${selectedChapterId===chapter.id?'underline':''}">${chapter.name}</span>
-          <span class="edit-btn text-blue-600" title="Edit" onclick="editChapter(${chapter.id},'${chapter.name.replace(/'/g,"\\'")}')">&#9998;</span>
-          <span class="del-btn text-red-600" title="Delete" onclick="deleteChapter(${chapter.id})">&#128465;</span>
-        `;
-        list.appendChild(div);
-      });
-    }
-    function selectChapter(id) {
-      selectedChapterId = id;
-      loadQuestions();
-    }
-
-    // Questions CRUD
-    async function addQuestion() {
-      if (!selectedChapterId) return alert("Select a chapter first.");
-      const question = document.getElementById('question-text').value.trim();
-      const option1 = document.getElementById('option1').value.trim();
-      const option2 = document.getElementById('option2').value.trim();
-      const option3 = document.getElementById('option3').value.trim();
-      const option4 = document.getElementById('option4').value.trim();
+    async function generateMCQ() {
+      const question = document.getElementById('question').value.trim();
       const answer = document.getElementById('answer').value.trim();
-      if (!question || !option1 || !option2 || !option3 || !option4 || !answer) {
-        alert("Fill in all fields.");
+      if (!question || !answer) {
+        alert("Please enter both question and correct answer.");
         return;
       }
-      const options = [option1, option2, option3, option4];
-      if (!options.includes(answer)) {
-        alert("Answer must match one of the options exactly.");
-        return;
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('mcq-form').classList.add('hidden');
+      try {
+        const prompt = `
+Generate a single multiple-choice question in JSON with these 6 fields:
+"question", "option_a", "option_b", "option_c", "option_d", "correct_answer".
+The correct answer must match one of the options exactly.
+All options must be unique and plausible, no duplicates.
+Do not include "None of the above" or "All of the above".
+Return only the JSON object, nothing else.
+
+For example:
+{
+  "question": "What is the capital of France?",
+  "option_a": "Berlin",
+  "option_b": "Madrid",
+  "option_c": "Paris",
+  "option_d": "Rome",
+  "correct_answer": "Paris"
+}
+
+Now, generate a question about: ${question}, with correct answer: ${answer}.
+`;
+        const res = await axios.post('https://api.openai.com/v1/chat/completions', {
+          model: "gpt-3.5-turbo",
+          messages: [{role: "user", content: prompt}],
+          temperature: 0.7,
+          max_tokens: 400
+        }, {
+          headers: {
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        let content = res.data.choices[0].message.content;
+        // Extract JSON from response
+        let jsonStr = content.match(/\{[\s\S]*\}/)?.[0];
+        if (!jsonStr) throw new Error("No JSON found in response");
+        let mcq = JSON.parse(jsonStr);
+        // Fill form
+        document.getElementById('mcq-question').value = mcq.question || question;
+        document.getElementById('mcq-option-a').value = mcq.option_a || '';
+        document.getElementById('mcq-option-b').value = mcq.option_b || '';
+        document.getElementById('mcq-option-c').value = mcq.option_c || '';
+        document.getElementById('mcq-option-d').value = mcq.option_d || '';
+        document.getElementById('mcq-correct').value = mcq.correct_answer || answer;
+        document.getElementById('mcq-form').classList.remove('hidden');
+      } catch (e) {
+        alert("AI error: " + e.message);
+        console.log(e);
       }
-      const { error } = await supabase.from('questions').insert([
-        { chapter_id: selectedChapterId, question, options: JSON.stringify(options), answer }
-      ]);
-      if (error) alert(error.message);
-      else {
-        document.getElementById('question-text').value = '';
-        document.getElementById('option1').value = '';
-        document.getElementById('option2').value = '';
-        document.getElementById('option3').value = '';
-        document.getElementById('option4').value = '';
-        document.getElementById('answer').value = '';
-        loadQuestions();
-      }
-    }
-    async function editQuestion(id, oldQ, oldOptions, oldAnswer) {
-      const opts = JSON.parse(oldOptions);
-      showModal(`
-        <h3 class="font-bold mb-2">Edit Question</h3>
-        <input id="edit-question-text" class="p-2 border rounded w-full mb-2" value="${oldQ}">
-        <input id="edit-option1" class="p-2 border rounded w-full mb-2" value="${opts[0]}">
-        <input id="edit-option2" class="p-2 border rounded w-full mb-2" value="${opts[1]}">
-        <input id="edit-option3" class="p-2 border rounded w-full mb-2" value="${opts[2]}">
-        <input id="edit-option4" class="p-2 border rounded w-full mb-2" value="${opts[3]}">
-        <input id="edit-answer" class="p-2 border rounded w-full mb-4" value="${oldAnswer}">
-        <div class="flex gap-2">
-          <button onclick="updateQuestion(${id})" class="bg-green-500 hover:bg-green-600 text-white p-2 rounded flex-1">Save</button>
-          <button onclick="hideModal()" class="bg-gray-200 p-2 rounded flex-1">Cancel</button>
-        </div>
-      `);
-    }
-    async function updateQuestion(id) {
-      const question = document.getElementById('edit-question-text').value.trim();
-      const option1 = document.getElementById('edit-option1').value.trim();
-      const option2 = document.getElementById('edit-option2').value.trim();
-      const option3 = document.getElementById('edit-option3').value.trim();
-      const option4 = document.getElementById('edit-option4').value.trim();
-      const answer = document.getElementById('edit-answer').value.trim();
-      const options = [option1, option2, option3, option4];
-      if (!question || !option1 || !option2 || !option3 || !option4 || !answer) {
-        alert("Fill in all fields.");
-        return;
-      }
-      if (!options.includes(answer)) {
-        alert("Answer must match one of the options exactly.");
-        return;
-      }
-      const { error } = await supabase.from('questions').update({
-        question, options: JSON.stringify(options), answer
-      }).eq('id', id);
-      if (error) alert(error.message);
-      hideModal();
-      loadQuestions();
-    }
-    async function deleteQuestion(id) {
-      if (!confirm('Delete this question?')) return;
-      await supabase.from('questions').delete().eq('id', id);
-      loadQuestions();
-    }
-    async function loadQuestions() {
-      if (!selectedChapterId) {
-        document.getElementById('admin-questions-list').innerHTML = '<span class="text-gray-400">Select a chapter</span>';
-        return;
-      }
-      const { data, error } = await supabase.from('questions').select('*').eq('chapter_id', selectedChapterId).order('id', { ascending: false });
-      if (error) return alert(error.message);
-      const list = document.getElementById('admin-questions-list');
-      list.innerHTML = '';
-      data.forEach(q => {
-        const div = document.createElement('div');
-        div.className = 'quiz-card bg-gradient-to-r from-purple-100 to-blue-100 p-3 rounded shadow flex flex-col sm:flex-row items-start sm:items-center gap-2 animate__animated animate__fadeIn';
-        let opts = JSON.parse(q.options);
-        div.innerHTML = `
-          <div class="flex-1">
-            <b>${q.question}</b><br>
-            ${opts.map((opt,i)=>`<span class="pl-2">${String.fromCharCode(65+i)}. ${opt}</span>`).join('<br>')}
-            <br><span class="text-green-600">Answer: ${q.answer}</span>
-          </div>
-          <div class="flex flex-row gap-2 ml-auto">
-            <span class="edit-btn text-blue-600" title="Edit" onclick="editQuestion(${q.id},'${q.question.replace(/'/g,"\\'")}',\`${q.options.replace(/`/g,"\\`")}\`,'${q.answer.replace(/'/g,"\\'")}')">&#9998;</span>
-            <span class="del-btn text-red-600" title="Delete" onclick="deleteQuestion(${q.id})">&#128465;</span>
-          </div>
-        `;
-        list.appendChild(div);
-      });
+      document.getElementById('loading').classList.add('hidden');
     }
 
-    // Modal helpers
-    function showModal(html) {
-      document.getElementById('modal-content').innerHTML = html;
-      document.getElementById('modal-bg').classList.remove('hidden');
+    // Save MCQ to local list (replace with your DB logic)
+    function saveMCQ(e) {
+      e.preventDefault();
+      const q = document.getElementById('mcq-question').value;
+      const a = document.getElementById('mcq-option-a').value;
+      const b = document.getElementById('mcq-option-b').value;
+      const c = document.getElementById('mcq-option-c').value;
+      const d = document.getElementById('mcq-option-d').value;
+      const correct = document.getElementById('mcq-correct').value;
+      // Display in table (replace with DB save)
+      const mcqList = document.getElementById('mcq-list');
+      const table = mcqList.querySelector('table') || (() => {
+        const t = document.createElement('table');
+        t.className = "w-full text-sm border mt-2";
+        t.innerHTML = `<thead><tr>
+          <th class="border px-2 py-1">Question</th>
+          <th class="border px-2 py-1">A</th>
+          <th class="border px-2 py-1">B</th>
+          <th class="border px-2 py-1">C</th>
+          <th class="border px-2 py-1">D</th>
+          <th class="border px-2 py-1">Correct</th>
+        </tr></thead><tbody></tbody>`;
+        mcqList.appendChild(t);
+        return t;
+      })();
+      const row = document.createElement('tr');
+      row.innerHTML = `<td class="border px-2 py-1">${q}</td>
+        <td class="border px-2 py-1">${a}</td>
+        <td class="border px-2 py-1">${b}</td>
+        <td class="border px-2 py-1">${c}</td>
+        <td class="border px-2 py-1">${d}</td>
+        <td class="border px-2 py-1 font-bold text-green-700">${correct}</td>`;
+      table.querySelector('tbody').appendChild(row);
+      document.getElementById('mcq-form').classList.add('hidden');
     }
-    function hideModal() {
-      document.getElementById('modal-bg').classList.add('hidden');
-    }
-    document.getElementById('modal-bg').onclick = function(e) {
-      if (e.target === this) hideModal();
-    };
-
-    // Scores Tab
-    async function loadScores() {
-      // join scores with users, subjects, chapters
-      const { data, error } = await supabase
-        .from('scores')
-        .select('*, users: user_id (email), subjects(name), chapters(name)')
-        .order('taken_at', { ascending: false });
-      if (error) return alert(error.message);
-      const tbody = document.getElementById('score-table');
-      tbody.innerHTML = '';
-      data.forEach(row => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="border px-2 py-1">${row.users ? row.users.email : ''}</td>
-          <td class="border px-2 py-1">${row.subjects ? row.subjects.name : ''}</td>
-          <td class="border px-2 py-1">${row.chapters ? row.chapters.name : ''}</td>
-          <td class="border px-2 py-1">${row.score}</td>
-          <td class="border px-2 py-1">${row.total}</td>
-          <td class="border px-2 py-1">${new Date(row.taken_at).toLocaleString()}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    // Realtime updates
-    supabase
-      .channel('admin-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'subjects' }, loadSubjects)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chapters' }, loadChapters)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions' }, loadQuestions)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores' }, loadScores)
-      .subscribe();
   </script>
 </body>
 </html>
