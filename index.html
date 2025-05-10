@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ArEQuiz Admin Panel</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <!-- Tailwind CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <!-- Animate.css -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+  <style>
+    .quiz-card { box-shadow: 0 8px 24px 0 rgba(80, 70, 229, 0.10), 0 1.5px 3px 0 rgba(0,0,0,0.05); }
+    .quiz-card:hover { transform: translateY(-4px) scale(1.03); }
+    .edit-btn, .del-btn { cursor:pointer; }
+    .modal-bg { background:rgba(0,0,0,0.3); }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-gray-100 via-purple-100 to-blue-100 min-h-screen flex flex-col items-center justify-center">
+
+  <!-- Auth Section -->
+  <div id="auth-section" class="w-full max-w-xs mx-auto mt-10 animate__animated animate__fadeIn">
+    <div class="bg-white shadow-lg rounded-lg p-8 quiz-card">
+      <h2 class="text-2xl font-bold text-center mb-6 text-purple-600">Admin Login</h2>
+      <input id="email" type="email" placeholder="Email" class="mb-3 w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-400 transition"/>
+      <input id="password" type="password" placeholder="Password" class="mb-3 w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-400 transition"/>
+      <button onclick="signInAdmin()" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-semibold p-2 rounded mb-2 transition animate__animated animate__pulse">Sign In as Admin</button>
+    </div>
+  </div>
+
+  <!-- Admin Panel -->
+  <div id="admin-section" class="hidden w-full max-w-4xl mx-auto mt-10 animate__animated animate__fadeIn">
+    <div class="bg-white shadow-lg rounded-lg p-4 sm:p-8 quiz-card">
+      <div class="flex justify-between items-center mb-4">
+        <h1 class="text-3xl font-bold text-purple-700">ArEQuiz Admin Panel</h1>
+        <button onclick="signOut()" class="bg-red-400 hover:bg-red-500 text-white font-semibold px-3 py-1 rounded transition">Sign Out</button>
+      </div>
+      <!-- Subjects -->
+      <div class="mb-8">
+        <h2 class="font-semibold mb-2">Subjects</h2>
+        <div class="flex gap-2 mb-3">
+          <input id="subject-name" type="text" placeholder="Subject Name" class="p-2 border rounded flex-1"/>
+          <button onclick="addSubject()" class="bg-green-500 hover:bg-green-600 text-white p-2 rounded transition">Add</button>
+        </div>
+        <div id="admin-subjects-list" class="flex flex-wrap gap-2"></div>
+      </div>
+      <!-- Chapters -->
+      <div class="mb-8">
+        <h2 class="font-semibold mb-2">Chapters</h2>
+        <div class="flex gap-2 mb-3">
+          <select id="chapter-subject" class="p-2 border rounded flex-1"></select>
+          <input id="chapter-name" type="text" placeholder="Chapter Name" class="p-2 border rounded flex-1"/>
+          <button onclick="addChapter()" class="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded transition">Add</button>
+        </div>
+        <div id="admin-chapters-list" class="flex flex-wrap gap-2"></div>
+      </div>
+      <!-- Questions -->
+      <div>
+        <h2 class="font-semibold mb-2">Questions</h2>
+        <div class="flex flex-col gap-2 mb-3 sm:flex-row">
+          <select id="question-chapter" class="p-2 border rounded flex-1"></select>
+          <input id="question-text" type="text" placeholder="Question" class="p-2 border rounded flex-1"/>
+        </div>
+        <div class="flex gap-2 mb-3">
+          <input id="option1" type="text" placeholder="Option 1" class="p-2 border rounded flex-1"/>
+          <input id="option2" type="text" placeholder="Option 2" class="p-2 border rounded flex-1"/>
+          <input id="option3" type="text" placeholder="Option 3" class="p-2 border rounded flex-1"/>
+          <input id="option4" type="text" placeholder="Option 4" class="p-2 border rounded flex-1"/>
+          <input id="answer" type="text" placeholder="Correct Answer (must match one option)" class="p-2 border rounded flex-1"/>
+          <button onclick="addQuestion()" class="bg-purple-500 hover:bg-purple-600 text-white p-2 rounded transition">Add</button>
+        </div>
+        <div id="admin-questions-list" class="flex flex-col gap-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div id="modal-bg" class="fixed inset-0 flex items-center justify-center z-50 modal-bg hidden">
+    <div id="modal-content" class="bg-white rounded-lg p-6 shadow-lg w-full max-w-md animate__animated animate__fadeIn"></div>
+  </div>
+
+  <!-- Supabase library -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script>
+    // Supabase credentials
+    const SUPABASE_URL = 'https://kahycodadobjjqriskoc.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthaHljb2RhZG9iampxcmlza29jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY4NTM4MDgsImV4cCI6MjA2MjQyOTgwOH0.QWPod9Pn1_fA9L9Xr6rmYpdX7BqV1AeUXp8BzatgAwo';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Admin Sign In
+    async function signInAdmin() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      if (!email || !password) {
+        alert("Please enter both email and password.");
+        return;
+      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      // Check if user is admin
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('is_admin')
+        .eq('email', email)
+        .single();
+      if (userError || !userData || !userData.is_admin) {
+        alert('Not an admin!');
+        await supabase.auth.signOut();
+        return;
+      }
+      document.getElementById('auth-section').classList.add('hidden');
+      document.getElementById('admin-section').classList.remove('hidden');
+      loadSubjects();
+      loadChapters();
+      loadQuestions();
+    }
+
+    // Sign Out
+    async function signOut() {
+      await supabase.auth.signOut();
+      document.getElementById('admin-section').classList.add('hidden');
+      document.getElementById('auth-section').classList.remove('hidden');
+    }
+
+    // Subjects CRUD
+    async function addSubject() {
+      const name = document.getElementById('subject-name').value.trim();
+      if (!name) return alert("Enter subject name.");
+      const { error } = await supabase.from('subjects').insert([{ name }]);
+      if (error) alert(error.message);
+      else {
+        document.getElementById('subject-name').value = '';
+        loadSubjects();
+      }
+    }
+    async function editSubject(id, oldName) {
+      showModal(`
+        <h3 class="font-bold mb-2">Edit Subject</h3>
+        <input id="edit-subject-name" class="p-2 border rounded w-full mb-4" value="${oldName}">
+        <div class="flex gap-2">
+          <button onclick="updateSubject(${id})" class="bg-green-500 hover:bg-green-600 text-white p-2 rounded flex-1">Save</button>
+          <button onclick="hideModal()" class="bg-gray-200 p-2 rounded flex-1">Cancel</button>
+        </div>
+      `);
+    }
+    async function updateSubject(id) {
+      const name = document.getElementById('edit-subject-name').value.trim();
+      if (!name) return alert("Enter subject name.");
+      const { error } = await supabase.from('subjects').update({ name }).eq('id', id);
+      if (error) alert(error.message);
+      hideModal();
+      loadSubjects();
+    }
+    async function deleteSubject(id) {
+      if (!confirm('Delete this subject and all its chapters/questions?')) return;
+      await supabase.from('subjects').delete().eq('id', id);
+      loadSubjects();
+      loadChapters();
+      loadQuestions();
+    }
+    async function loadSubjects() {
+      const { data, error } = await supabase.from('subjects').select('*');
+      if (error) return alert(error.message);
+      // List
+      const list = document.getElementById('admin-subjects-list');
+      list.innerHTML = '';
+      data.forEach(subject => {
+        const div = document.createElement('div');
+        div.className = 'quiz-card bg-purple-100 text-purple-900 px-3 py-1 rounded shadow flex items-center gap-2 animate__animated animate__fadeIn';
+        div.innerHTML = `
+          <span class="flex-1">${subject.name}</span>
+          <span class="edit-btn text-blue-600" title="Edit" onclick="editSubject(${subject.id},'${subject.name.replace(/'/g,"\\'")}')">&#9998;</span>
+          <span class="del-btn text-red-600" title="Delete" onclick="deleteSubject(${subject.id})">&#128465;</span>
+        `;
+        list.appendChild(div);
+      });
+      // Dropdown for chapters
+      const chapterSubject = document.getElementById('chapter-subject');
+      chapterSubject.innerHTML = '';
+      data.forEach(subject => {
+        const opt = document.createElement('option');
+        opt.value = subject.id;
+        opt.textContent = subject.name;
+        chapterSubject.appendChild(opt);
+      });
+    }
+
+    // Chapters CRUD
+    async function addChapter() {
+      const subjectId = document.getElementById('chapter-subject').value;
+      const name = document.getElementById('chapter-name').value.trim();
+      if (!name) return alert("Enter chapter name.");
+      const { error } = await supabase.from('chapters').insert([{ name, subject_id: subjectId }]);
+      if (error) alert(error.message);
+      else {
+        document.getElementById('chapter-name').value = '';
+        loadChapters();
+      }
+    }
+    async function editChapter(id, oldName, subjectId) {
+      showModal(`
+        <h3 class="font-bold mb-2">Edit Chapter</h3>
+        <input id="edit-chapter-name" class="p-2 border rounded w-full mb-4" value="${oldName}">
+        <div class="flex gap-2">
+          <button onclick="updateChapter(${id},${subjectId})" class="bg-green-500 hover:bg-green-600 text-white p-2 rounded flex-1">Save</button>
+          <button onclick="hideModal()" class="bg-gray-200 p-2 rounded flex-1">Cancel</button>
+        </div>
+      `);
+    }
+    async function updateChapter(id, subjectId) {
+      const name = document.getElementById('edit-chapter-name').value.trim();
+      if (!name) return alert("Enter chapter name.");
+      const { error } = await supabase.from('chapters').update({ name }).eq('id', id);
+      if (error) alert(error.message);
+      hideModal();
+      loadChapters();
+    }
+    async function deleteChapter(id) {
+      if (!confirm('Delete this chapter and all its questions?')) return;
+      await supabase.from('chapters').delete().eq('id', id);
+      loadChapters();
+      loadQuestions();
+    }
+    async function loadChapters() {
+      const { data, error } = await supabase.from('chapters').select('*, subjects(name)');
+      if (error) return alert(error.message);
+      // List
+      const list = document.getElementById('admin-chapters-list');
+      list.innerHTML = '';
+      data.forEach(chapter => {
+        const div = document.createElement('div');
+        div.className = 'quiz-card bg-blue-100 text-blue-900 px-3 py-1 rounded shadow flex items-center gap-2 animate__animated animate__fadeIn';
+        div.innerHTML = `
+          <span class="flex-1">${chapter.name} (${chapter.subjects ? chapter.subjects.name : 'Unknown'})</span>
+          <span class="edit-btn text-blue-600" title="Edit" onclick="editChapter(${chapter.id},'${chapter.name.replace(/'/g,"\\'")}',${chapter.subject_id})">&#9998;</span>
+          <span class="del-btn text-red-600" title="Delete" onclick="deleteChapter(${chapter.id})">&#128465;</span>
+        `;
+        list.appendChild(div);
+      });
+      // Dropdown for questions
+      const questionChapter = document.getElementById('question-chapter');
+      questionChapter.innerHTML = '';
+      data.forEach(chapter => {
+        const opt = document.createElement('option');
+        opt.value = chapter.id;
+        opt.textContent = `${chapter.name} (${chapter.subjects ? chapter.subjects.name : 'Unknown'})`;
+        questionChapter.appendChild(opt);
+      });
+    }
+
+    // Questions CRUD
+    async function addQuestion() {
+      const chapterId = document.getElementById('question-chapter').value;
+      const question = document.getElementById('question-text').value.trim();
+      const option1 = document.getElementById('option1').value.trim();
+      const option2 = document.getElementById('option2').value.trim();
+      const option3 = document.getElementById('option3').value.trim();
+      const option4 = document.getElementById('option4').value.trim();
+      const answer = document.getElementById('answer').value.trim();
+      if (!question || !option1 || !option2 || !option3 || !option4 || !answer) {
+        alert("Fill in all fields.");
+        return;
+      }
+      const options = [option1, option2, option3, option4];
+      if (!options.includes(answer)) {
+        alert("Answer must match one of the options exactly.");
+        return;
+      }
+      const { error } = await supabase.from('questions').insert([
+        { chapter_id: chapterId, question, options: JSON.stringify(options), answer }
+      ]);
+      if (error) alert(error.message);
+      else {
+        document.getElementById('question-text').value = '';
+        document.getElementById('option1').value = '';
+        document.getElementById('option2').value = '';
+        document.getElementById('option3').value = '';
+        document.getElementById('option4').value = '';
+        document.getElementById('answer').value = '';
+        loadQuestions();
+      }
+    }
+    async function editQuestion(id, oldQ, oldOptions, oldAnswer, chapterId) {
+      const opts = JSON.parse(oldOptions);
+      showModal(`
+        <h3 class="font-bold mb-2">Edit Question</h3>
+        <input id="edit-question-text" class="p-2 border rounded w-full mb-2" value="${oldQ}">
+        <input id="edit-option1" class="p-2 border rounded w-full mb-2" value="${opts[0]}">
+        <input id="edit-option2" class="p-2 border rounded w-full mb-2" value="${opts[1]}">
+        <input id="edit-option3" class="p-2 border rounded w-full mb-2" value="${opts[2]}">
+        <input id="edit-option4" class="p-2 border rounded w-full mb-2" value="${opts[3]}">
+        <input id="edit-answer" class="p-2 border rounded w-full mb-4" value="${oldAnswer}">
+        <div class="flex gap-2">
+          <button onclick="updateQuestion(${id},${chapterId})" class="bg-green-500 hover:bg-green-600 text-white p-2 rounded flex-1">Save</button>
+          <button onclick="hideModal()" class="bg-gray-200 p-2 rounded flex-1">Cancel</button>
+        </div>
+      `);
+    }
+    async function updateQuestion(id, chapterId) {
+      const question = document.getElementById('edit-question-text').value.trim();
+      const option1 = document.getElementById('edit-option1').value.trim();
+      const option2 = document.getElementById('edit-option2').value.trim();
+      const option3 = document.getElementById('edit-option3').value.trim();
+      const option4 = document.getElementById('edit-option4').value.trim();
+      const answer = document.getElementById('edit-answer').value.trim();
+      const options = [option1, option2, option3, option4];
+      if (!question || !option1 || !option2 || !option3 || !option4 || !answer) {
+        alert("Fill in all fields.");
+        return;
+      }
+      if (!options.includes(answer)) {
+        alert("Answer must match one of the options exactly.");
+        return;
+      }
+      const { error } = await supabase.from('questions').update({
+        question, options: JSON.stringify(options), answer
+      }).eq('id', id);
+      if (error) alert(error.message);
+      hideModal();
+      loadQuestions();
+    }
+    async function deleteQuestion(id) {
+      if (!confirm('Delete this question?')) return;
+      await supabase.from('questions').delete().eq('id', id);
+      loadQuestions();
+    }
+    async function loadQuestions() {
+      const { data, error } = await supabase.from('questions').select('*, chapters(name), chapters(subject_id), chapters(subjects(name))').order('id', { ascending: false });
+      if (error) return alert(error.message);
+      const list = document.getElementById('admin-questions-list');
+      list.innerHTML = '';
+      data.forEach(q => {
+        const div = document.createElement('div');
+        div.className = 'quiz-card bg-gradient-to-r from-purple-100 to-blue-100 p-3 rounded shadow flex flex-col sm:flex-row items-start sm:items-center gap-2 animate__animated animate__fadeIn';
+        let opts = JSON.parse(q.options);
+        div.innerHTML = `
+          <div class="flex-1">
+            <b>${q.question}</b>
+            <span class="text-xs text-gray-500">(${q.chapters ? q.chapters.name : 'No chapter'})</span><br>
+            ${opts.map((opt,i)=>`<span class="pl-2">${String.fromCharCode(65+i)}. ${opt}</span>`).join('<br>')}
+            <br><span class="text-green-600">Answer: ${q.answer}</span>
+          </div>
+          <div class="flex flex-row gap-2 ml-auto">
+            <span class="edit-btn text-blue-600" title="Edit" onclick="editQuestion(${q.id},'${q.question.replace(/'/g,"\\'")}',\`${q.options.replace(/`/g,"\\`")}\`,'${q.answer.replace(/'/g,"\\'")}',${q.chapter_id})">&#9998;</span>
+            <span class="del-btn text-red-600" title="Delete" onclick="deleteQuestion(${q.id})">&#128465;</span>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    // Modal helpers
+    function showModal(html) {
+      document.getElementById('modal-content').innerHTML = html;
+      document.getElementById('modal-bg').classList.remove('hidden');
+    }
+    function hideModal() {
+      document.getElementById('modal-bg').classList.add('hidden');
+    }
+    document.getElementById('modal-bg').onclick = function(e) {
+      if (e.target === this) hideModal();
+    };
+
+    // Realtime updates
+    supabase
+      .channel('admin-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subjects' }, loadSubjects)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chapters' }, loadChapters)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions' }, loadQuestions)
+      .subscribe();
+  </script>
+</body>
+</html>
